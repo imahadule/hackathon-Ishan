@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # MLflow Tracking Server
+  mlflow:
+    image: mlflow/mlflow:latest
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    networks:
+      - monitoring
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+
+  # Prometheus Pushgateway for pushing metrics
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - monitoring
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - monitoring
+
+  # MLflow Monitoring Exporter (our custom service)
+  mlflow-exporter:
+    build: .
+    container_name: mlflow-exporter
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PROMETHEUS_GATEWAY=pushgateway:9091
+      - PRAMATHUS_ENDPOINT=http://pramathus-mock:8080/api/metrics
+      - PRAMATHUS_ENABLED=true
+      - EXPORT_INTERVAL=30
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    depends_on:
+      - mlflow
+      - pushgateway
+    networks:
+      - monitoring
+    command: python mlflow_monitoring_exporter.py continuous
+
+  # Mock Pramathus service for testing
+  pramathus-mock:
+    image: nginx:alpine
+    container_name: pramathus-mock
+    ports:
+      - "8080:80"
+    volumes:
+      - ./pramathus-mock/nginx.conf:/etc/nginx/nginx.conf
+      - ./pramathus-mock/html:/usr/share/nginx/html
+    networks:
+      - monitoring
+
+volumes:
+  mlflow_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  monitoring:
+    driver: bridge

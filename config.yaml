@@ -1,0 +1,54 @@
+# MLflow Monitoring Configuration
+# ====================================
+
+# MLflow Configuration
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  max_experiments: 10
+  include_system_metrics: true
+
+# Prometheus/Grafana Configuration
+prometheus:
+  gateway: "localhost:9091"
+  job_name: "mlflow_metrics"
+  enabled: true
+
+# Pramathus Configuration
+# Note: If "Pramathus" is your custom monitoring platform, 
+# update the endpoint and authentication details below
+pramathus:
+  endpoint: "http://localhost:8080/api/metrics"
+  api_key: null  # Set via environment variable PRAMATHUS_API_KEY
+  enabled: true
+  timeout: 30
+  batch_size: 100
+
+# Export Configuration
+export:
+  interval: 60  # seconds
+  mode: "continuous"  # options: "once", "continuous", "scheduled"
+  
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null  # Set to file path for file logging
+
+# Advanced Features
+features:
+  enable_drift_detection: false
+  enable_model_evaluation: false
+  enable_data_quality_checks: false
+  
+# Alerting (for future implementation)
+alerting:
+  enabled: false
+  channels:
+    - type: "email"
+      config:
+        smtp_server: "smtp.gmail.com"
+        smtp_port: 587
+        recipients: []
+    - type: "slack"
+      config:
+        webhook_url: null
